@@ -1,0 +1,43 @@
+WITH every_day_hackers AS (
+	SELECT 
+		submission_date ,
+		hacker_id ,
+		DENSE_RANK() OVER(PARTITION BY hacker_id ORDER BY submission_date ASC) AS rnk
+	FROM submissions
+	ORDER BY submission_date, hacker_id 
+), unique_hackers AS (
+	SELECT 
+		submission_date ,
+		COUNT(DISTINCT hacker_id) AS total_unique_hackers
+	FROM every_day_hackers 
+	WHERE rnk = EXTRACT('DAY' FROM submission_date)
+	GROUP BY submission_date
+), per_day_submissions AS (
+	SELECT
+		submission_date ,
+		hacker_id ,
+		COUNT(*) AS per_day_submissions
+	FROM every_day_hackers
+	GROUP BY submission_date , hacker_id
+), hacker_id_identified AS (
+	SELECT * ,
+		ROW_NUMBER() OVER(PARTITION BY submission_date ORDER BY per_day_submissions DESC, hacker_id ASC) AS hacker_id_identifier
+	FROM per_day_submissions
+), hackerss AS (
+	SELECT 
+		submission_date ,
+		hacker_id 
+	FROM hacker_id_identified
+	WHERE hacker_id_identifier = 1
+)
+SELECT 
+	uh.submission_date ,
+	uh.total_unique_hackers ,
+	hs.hacker_id ,
+	h."name" 
+FROM unique_hackers uh 
+INNER JOIN hackerss hs 
+	ON uh.submission_date = hs.submission_date
+INNER JOIN hackers h
+	ON hs.hacker_id = h.hacker_id 
+ORDER BY submission_date ;
